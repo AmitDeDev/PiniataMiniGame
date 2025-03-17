@@ -8,6 +8,8 @@ public class GameView : MonoBehaviour
 {
     [SerializeField] private TextMeshProUGUI scoreText;
     [SerializeField] private TextMeshProUGUI timerText;
+    [SerializeField] private TextMeshProUGUI piniataNumText;
+    [SerializeField] private TextMeshProUGUI timeGapWarningText;
     [SerializeField] private GameObject piniataOnCooldownObj;
     [SerializeField] private ParticleSystem HitParticleSystem;
 
@@ -21,6 +23,10 @@ public class GameView : MonoBehaviour
     public void UpdateTimer(float _time)
     {
         timerText.text = "Time Left: " + Mathf.Ceil(_time);
+    }
+    public void UpdatePiniataNum(float _piniataNum)
+    {
+        piniataNumText.text = "Piniata: " + _piniataNum + "#";
     }
     
     public void SpawnHitParticles()
@@ -36,10 +42,33 @@ public class GameView : MonoBehaviour
     
     private IEnumerator PiniataCooldown(bool _isActive, float _duration)
     {
-        piniataOnCooldownObj.GameObject().SetActive(_isActive);
+        piniataOnCooldownObj.SetActive(_isActive);
+
         TextMeshProUGUI cooldownText = piniataOnCooldownObj.GetComponentInChildren<TextMeshProUGUI>();
-        cooldownText.text = Mathf.Ceil(3f).ToString();
+        cooldownText.text = Mathf.Ceil(_duration).ToString();
+
+        float remain = _duration;
+        while (remain > 0f)
+        {
+            remain -= Time.deltaTime;
+            cooldownText.text = Mathf.Ceil(remain).ToString();
+            yield return null;
+        }
+
+        piniataOnCooldownObj.SetActive(!_isActive);
+    }
+    
+    public void SetClickGapWarning(float _duration)
+    {
+        StartCoroutine(TimeGapWarning(_duration));
+    }
+    
+    private IEnumerator TimeGapWarning(float _duration)
+    {
+        timeGapWarningText.gameObject.SetActive(true);
+
         yield return new WaitForSeconds(_duration);
-        piniataOnCooldownObj.GameObject().SetActive(!_isActive);
+
+        timeGapWarningText.gameObject.SetActive(false);
     }
 }
