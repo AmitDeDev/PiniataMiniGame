@@ -1,74 +1,92 @@
 using System.Collections;
-using System.Collections.Generic;
-using TMPro;
-using Unity.VisualScripting;
 using UnityEngine;
+using TMPro;
 
 public class GameView : MonoBehaviour
 {
+    [Header("Texts")]
     [SerializeField] private TextMeshProUGUI scoreText;
     [SerializeField] private TextMeshProUGUI timerText;
     [SerializeField] private TextMeshProUGUI piniataNumText;
     [SerializeField] private TextMeshProUGUI timeGapWarningText;
+    
+    [Header("GameObjects and UI")]
     [SerializeField] private GameObject piniataOnCooldownObj;
-    [SerializeField] private ParticleSystem HitParticleSystem;
+    
+    [Header("Effects and Animations")]
+    [SerializeField] private ParticleSystem hitParticleSystem;
 
     private ParticleSystem piniataHitParticleInstance;
 
-    public void UpdateScore(int _score)
+    public void Init(GameManager manager)
     {
-        scoreText.text = "Score: " + _score;
+        manager.OnScoreUpdated += UpdateScore;
+        manager.OnCooldownTriggered += HandleCooldownOverlay;
+
+        // if I need to subscribe to more events, I need to do that here
+        timeGapWarningText.gameObject.SetActive(false);
+        piniataOnCooldownObj.SetActive(false);
     }
 
-    public void UpdateTimer(float _time)
+    public void UpdateScore(int newScore)
     {
-        timerText.text = "Time Left: " + Mathf.Ceil(_time);
+        scoreText.text = $"Score: {newScore}";
     }
-    public void UpdatePiniataNum(float _piniataNum)
+
+    public void UpdateTimer(float timeLeft)
     {
-        piniataNumText.text = "Piniata: " + _piniataNum + "#";
+        timerText.text = "Time Left: " + Mathf.Ceil(timeLeft);
     }
-    
+
+    public void UpdatePiniataNum(float piñataNum)
+    {
+        piniataNumText.text = "Piniata: " + piñataNum + "#";
+    }
+
+    public void ShowTimeGapWarning(float duration)
+    {
+        StartCoroutine(TimeGapWarning(duration));
+    }
+
+    private System.Collections.IEnumerator TimeGapWarning(float duration)
+    {
+        timeGapWarningText.gameObject.SetActive(true);
+        yield return new WaitForSeconds(duration);
+        timeGapWarningText.gameObject.SetActive(false);
+    }
+
     public void SpawnHitParticles()
     {
-        piniataHitParticleInstance =
-            Instantiate(HitParticleSystem, piniataOnCooldownObj.transform.position, Quaternion.identity);
-    }
-
-    public void SetPiniataCooldown(bool _isActive, float _duration)
-    {
-        StartCoroutine(PiniataCooldown(_isActive, _duration));
+        piniataHitParticleInstance = Instantiate(
+            hitParticleSystem,
+            piniataOnCooldownObj.transform.position,
+            Quaternion.identity
+        );
     }
     
-    private IEnumerator PiniataCooldown(bool _isActive, float _duration)
+    private void HandleCooldownOverlay(bool isActive, float cdDuration)
     {
-        piniataOnCooldownObj.SetActive(_isActive);
+        if (isActive)
+        {
+            piniataOnCooldownObj.SetActive(true);
+            StartCoroutine(ShowCooldownCountdown(cdDuration));
+        }
+        else
+        {
+            piniataOnCooldownObj.SetActive(false);
+        }
+    }
 
+    private IEnumerator ShowCooldownCountdown(float cdDuration)
+    {
         TextMeshProUGUI cooldownText = piniataOnCooldownObj.GetComponentInChildren<TextMeshProUGUI>();
-        cooldownText.text = Mathf.Ceil(_duration).ToString();
-
-        float remain = _duration;
+        float remain = cdDuration;
         while (remain > 0f)
         {
             remain -= Time.deltaTime;
             cooldownText.text = Mathf.Ceil(remain).ToString();
             yield return null;
         }
-
-        piniataOnCooldownObj.SetActive(!_isActive);
-    }
-    
-    public void SetClickGapWarning(float _duration)
-    {
-        StartCoroutine(TimeGapWarning(_duration));
-    }
-    
-    private IEnumerator TimeGapWarning(float _duration)
-    {
-        timeGapWarningText.gameObject.SetActive(true);
-
-        yield return new WaitForSeconds(_duration);
-
-        timeGapWarningText.gameObject.SetActive(false);
+        piniataOnCooldownObj.SetActive(false);
     }
 }

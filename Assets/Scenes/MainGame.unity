@@ -169,6 +169,9 @@ MonoBehaviour:
   gameView: {fileID: 774472623}
   piniataSpawnPoint: {fileID: 1448737288}
   piniataPrefab: {fileID: 7466784356484480633, guid: 7e7ffabf3b5691147a69038b4b36893c, type: 3}
+  maxClickInterval: 2
+  cooldownDuration: 3
+  overshootGracePeriod: 1
 --- !u!1 &323410534
 GameObject:
   m_ObjectHideFlags: 0
@@ -985,7 +988,7 @@ MonoBehaviour:
   piniataNumText: {fileID: 1726247066}
   timeGapWarningText: {fileID: 602960678}
   piniataOnCooldownObj: {fileID: 453147678}
-  HitParticleSystem: {fileID: 4532957243376036210, guid: 423fc30ea1cbf9e4aae359e5c2b45109, type: 3}
+  hitParticleSystem: {fileID: 4532957243376036210, guid: 423fc30ea1cbf9e4aae359e5c2b45109, type: 3}
 --- !u!1 &790271298
 GameObject:
   m_ObjectHideFlags: 0
@@ -1639,7 +1642,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3715624281083384709, guid: c221d3508b7642240983dfa03cdb9212, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 5912562129347850742, guid: c221d3508b7642240983dfa03cdb9212, type: 3}
       propertyPath: m_LocalPosition.x
