@@ -29,11 +29,25 @@ public class GameManager : MonoBehaviour
     private bool isPotentiallyOpened;
     private Coroutine openDelayCoroutine;
     private GameObject currentPiniata;
+    
+    private int piniatasOpenedSinceLastBomb = 0;
+    private const int minPiniatasBeforeBombChance = 3;
+    private const float BombGrantChance = 0.2f; 
+    
+    private int piñatasOpenedSinceLastCritical = 0;
+    private const int MinPiniatasBeforeCriticalChance = 5;
+    private const float CriticalGrantChance = 0.3f; 
 
+
+    
     #region Events
+    
     public event Action<int> OnScoreUpdated;
-    public event Action<bool, float> OnCooldownTriggered; 
     // e.g. OnCooldownTriggered(isActive, duration) => View can show overlay
+    public event Action<bool, float> OnCooldownTriggered; 
+    public event Action<int> OnBombCountUpdated;
+    public event Action<int> OnCriticalCountUpdated;
+
     #endregion
 
     private void Awake()
@@ -51,8 +65,10 @@ public class GameManager : MonoBehaviour
         gameView.UpdateScore(gameModel.Score);
         gameView.UpdateTimer(gameModel.Timer);
         gameView.UpdatePiniataNum(piniataModel.CurrentPiniataNum);
+        OnBombCountUpdated?.Invoke(gameModel.BombCount);
+        OnCriticalCountUpdated?.Invoke(gameModel.CriticalCount);
 
-        SpawnNewPiñata();
+        SpawnNewPiniata();
     }
 
     private void Update()
@@ -60,25 +76,32 @@ public class GameManager : MonoBehaviour
         UpdateTimer(Time.deltaTime);
     }
     
-    public void OnPiñataClicked()
+    public void OnPiniataClicked()
     {
         if (isCooldownActive) return;
 
         float timeSinceLastClick = Time.time - lastClickTime;
         lastClickTime = Time.time;
 
-        // Gap check
         if (piniataModel.ClickCount > 0 && !isPotentiallyOpened && timeSinceLastClick > maxClickInterval)
         {
             piniataModel.ClickCount = 0;
-            gameView.ShowTimeGapWarning(2f); 
+            gameView.ShowNotificationsWithTimer(2f, "Taking your time huh?");
             return;
         }
 
-        piniataModel.ClickCount++;
-        gameView.SpawnHitParticles();
+        int actualClickIncrement = 1;
 
-        // If already reached required clicks and are in time period => overshoot
+        // If a critical is pending, add the extra value to this click
+        if (gameModel.NextCriticalValue > 0)
+        {
+            actualClickIncrement += gameModel.NextCriticalValue;
+            gameModel.NextCriticalValue = 0;
+        }
+        
+        piniataModel.ClickCount += actualClickIncrement;
+        gameView.SpawnHitParticles();
+        
         if (isPotentiallyOpened)
         {
             StartCooldown();
@@ -86,7 +109,6 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        // Check exact vs overshoot
         if (piniataModel.ClickCount == piniataModel.ClicksRequired)
         {
             isPotentiallyOpened = true;
@@ -101,9 +123,10 @@ public class GameManager : MonoBehaviour
 
     #region Core Logic
 
-    private void SpawnNewPiñata()
+    private void SpawnNewPiniata()
     {
-        if (currentPiniata != null) Destroy(currentPiniata);
+        if (currentPiniata != null) 
+            Destroy(currentPiniata);
 
         piniataModel.CurrentPiniataNum++;
         piniataModel.ClicksRequired = piniataModel.CurrentPiniataNum;
@@ -114,7 +137,9 @@ public class GameManager : MonoBehaviour
         gameView.UpdatePiniataNum(piniataModel.CurrentPiniataNum);
         
         currentPiniata = Instantiate(piniataPrefab, piniataSpawnPoint);
-        currentPiniata.GetComponent<Button>().onClick.AddListener(() => OnPiñataClicked());
+        Button piniataBtn = currentPiniata.GetComponent<Button>();
+        piniataBtn.onClick.AddListener(() => OnPiniataClicked());
+        piniataBtn.AddSquishEffect(0.8f, 0.1f);
 
         lastClickTime = Time.time;
     }
@@ -140,11 +165,82 @@ public class GameManager : MonoBehaviour
 
         gameModel.Score += piniataModel.CurrentPiniataNum;
         OnScoreUpdated?.Invoke(gameModel.Score);
+        gameView.UpdateScore(gameModel.Score);
+        
+        piñatasOpenedSinceLastCritical++;
+        TryGrantCritical();
+        piniatasOpenedSinceLastBomb++;
+        TryGrantBomb();
 
         Destroy(currentPiniata, 0.7f);
-        SpawnNewPiñata();
+        SpawnNewPiniata();
         ResetClicks();
     }
+    
+    private void TryGrantCritical()
+    {
+        if (piñatasOpenedSinceLastCritical >= MinPiniatasBeforeCriticalChance)
+        {
+            float roll = UnityEngine.Random.value;
+            if (roll <= CriticalGrantChance)
+            {
+                gameModel.CriticalCount++;
+                OnCriticalCountUpdated?.Invoke(gameModel.CriticalCount);
+                
+                gameView.ShowNotificationsWithTimer(3f, "You've won A Critical Hit TNT!");
+                
+                piñatasOpenedSinceLastCritical = 0;
+            }
+        }
+    }
+
+    
+    private void TryGrantBomb()
+    {
+        if (piniatasOpenedSinceLastBomb >= minPiniatasBeforeBombChance)
+        {
+            float roll = UnityEngine.Random.value; 
+            if (roll <= BombGrantChance)
+            {
+                gameView.ShowNotificationsWithTimer(2f, "You've won A BOMB!"); 
+                gameModel.BombCount++;
+                OnBombCountUpdated?.Invoke(gameModel.BombCount);
+                
+                piniatasOpenedSinceLastBomb = 0;
+            }
+        }
+    }
+    
+    public void OnBombButtonClicked()
+    {
+        if (gameModel.BombCount <= 0) return;
+        
+        gameModel.BombCount--;
+        OnBombCountUpdated?.Invoke(gameModel.BombCount);
+        
+        if (!isCooldownActive && !piniataModel.IsOpened)
+        {
+            FinalizeOpen();
+        }
+    }
+    
+    public void OnCriticalButtonClicked()
+    {
+        if (gameModel.CriticalCount <= 0) return;
+        
+        gameModel.CriticalCount--;
+        OnCriticalCountUpdated?.Invoke(gameModel.CriticalCount);
+        
+        int max = Mathf.Max(1, piniataModel.ClicksRequired - 1);
+        int randomExtra = UnityEngine.Random.Range(1, max + 1);
+        
+        gameModel.NextCriticalValue = randomExtra;
+        
+        gameView.ShowNotificationsWithTimer(3f,
+            $"Your next click = {randomExtra} clicks!");
+    }
+
+
 
     private void StartCooldown()
     {

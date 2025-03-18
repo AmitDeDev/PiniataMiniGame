@@ -1,6 +1,8 @@
 using System.Collections;
 using UnityEngine;
 using TMPro;
+using UnityEngine.Serialization;
+using UnityEngine.UI;
 
 public class GameView : MonoBehaviour
 {
@@ -8,10 +10,14 @@ public class GameView : MonoBehaviour
     [SerializeField] private TextMeshProUGUI scoreText;
     [SerializeField] private TextMeshProUGUI timerText;
     [SerializeField] private TextMeshProUGUI piniataNumText;
-    [SerializeField] private TextMeshProUGUI timeGapWarningText;
+    [SerializeField] private TextMeshProUGUI bombCountText;
+    [SerializeField] private TextMeshProUGUI criticalCountText;
     
     [Header("GameObjects and UI")]
     [SerializeField] private GameObject piniataOnCooldownObj;
+    [SerializeField] private Button bombButton;
+    [FormerlySerializedAs("criticalHitButton")] [SerializeField] private Button criticalButton;
+    [SerializeField] private GameObject Notifications;
     
     [Header("Effects and Animations")]
     [SerializeField] private ParticleSystem hitParticleSystem;
@@ -22,11 +28,20 @@ public class GameView : MonoBehaviour
     {
         manager.OnScoreUpdated += UpdateScore;
         manager.OnCooldownTriggered += HandleCooldownOverlay;
-
-        // if I need to subscribe to more events, I need to do that here
-        timeGapWarningText.gameObject.SetActive(false);
+        manager.OnBombCountUpdated += UpdateBombUI; 
+        manager.OnCriticalCountUpdated += UpdateCriticalUI;
+        
+        bombButton.AddSquishEffect(0.8f,0.1f);
+        bombButton.onClick.AddListener(() => manager.OnBombButtonClicked());
+        
+        criticalButton.AddSquishEffect(0.8f, 0.1f);
+        criticalButton.onClick.AddListener(() => manager.OnCriticalButtonClicked());
+    
+        Notifications.gameObject.SetActive(false);
         piniataOnCooldownObj.SetActive(false);
+        bombButton.gameObject.SetActive(true);
     }
+
 
     public void UpdateScore(int newScore)
     {
@@ -43,16 +58,31 @@ public class GameView : MonoBehaviour
         piniataNumText.text = "Piniata: " + piñataNum + "#";
     }
 
-    public void ShowTimeGapWarning(float duration)
+    public void ShowNotificationsWithTimer(float duration, string text)
     {
-        StartCoroutine(TimeGapWarning(duration));
+        StartCoroutine(Notification(duration,text));
+    }
+    
+    private void UpdateBombUI(int newBombCount)
+    {
+        bombCountText.text = $"x{newBombCount}";
+        bombButton.interactable = (newBombCount > 0);
+    }
+    
+    private void UpdateCriticalUI(int newCriticalCount)
+    {
+        criticalCountText.text = $"x{newCriticalCount}";
+        criticalButton.interactable = (newCriticalCount > 0);
     }
 
-    private System.Collections.IEnumerator TimeGapWarning(float duration)
+
+
+    private IEnumerator Notification(float duration, string text)
     {
-        timeGapWarningText.gameObject.SetActive(true);
+        Notifications.gameObject.SetActive(true);
+        Notifications.GetComponentInChildren<TextMeshProUGUI>().text = text;
         yield return new WaitForSeconds(duration);
-        timeGapWarningText.gameObject.SetActive(false);
+        Notifications.gameObject.SetActive(false);
     }
 
     public void SpawnHitParticles()
